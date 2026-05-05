@@ -287,6 +287,25 @@ function init() {
     render();
   });
 
+  const searchWrapper = document.getElementById('searchWrapper');
+  const searchToggleBtn = document.getElementById('searchToggle');
+
+  searchToggleBtn.addEventListener('click', () => {
+    const isOpen = !searchWrapper.hidden;
+    if (isOpen) {
+      searchWrapper.hidden = true;
+      searchToggleBtn.classList.remove('active');
+      searchInput.value = '';
+      searchQuery = '';
+      searchClear.hidden = true;
+      render();
+    } else {
+      searchWrapper.hidden = false;
+      searchToggleBtn.classList.add('active');
+      searchInput.focus();
+    }
+  });
+
   document.getElementById('tagInputWrapper').addEventListener('click', () => {
     document.getElementById('inputTag').focus();
   });

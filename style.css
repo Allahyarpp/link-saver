@@ -28,7 +28,7 @@ body::after {
   inset: 8px;
   border: 2px solid transparent;
   background:
-    linear-gradient(#f4f4f4, #f4f4f4) padding-box,
+    transparent padding-box,
     var(--gradient) border-box;
   border-radius: 18px;
   pointer-events: none;

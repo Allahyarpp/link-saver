@@ -13,10 +13,21 @@
 
   <header class="glass-header">
     <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">✦</span>
-        Link Saver
-      </div>
+      <svg class="logo-svg" width="42" height="27" viewBox="0 0 42 27" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Link Saver">
+        <defs>
+          <linearGradient id="logoGrad" x1="0" y1="0" x2="42" y2="27" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stop-color="#7c3aed"/>
+            <stop offset="50%"  stop-color="#db2777"/>
+            <stop offset="100%" stop-color="#0ea5e9"/>
+          </linearGradient>
+          <mask id="link1Mask">
+            <rect width="42" height="27" fill="white"/>
+            <rect x="16" y="11" width="24" height="14" rx="7" fill="black"/>
+          </mask>
+        </defs>
+        <rect x="2"  y="2"  width="24" height="14" rx="7" stroke="url(#logoGrad)" stroke-width="2.5" fill="none" mask="url(#link1Mask)"/>
+        <rect x="16" y="11" width="24" height="14" rx="7" stroke="url(#logoGrad)" stroke-width="2.5" fill="none"/>
+      </svg>
       <button id="openModal" class="btn-primary">+ Add Link</button>
     </div>
   </header>

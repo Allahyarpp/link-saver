@@ -7,6 +7,7 @@ const TAG_COLORS = [
 
 let links = [];
 let activeTag = 'all';
+let searchQuery = '';
 let modalTags = [];
 const tagColorMap = new Map();
 
@@ -120,12 +121,24 @@ function renderTagBar() {
 function renderLinks() {
   const grid = document.getElementById('linksGrid');
   const emptyState = document.getElementById('emptyState');
-  const filtered = activeTag === 'all' ? links : links.filter(l => l.tags.includes(activeTag));
+  const q = searchQuery.toLowerCase();
+
+  const filtered = links.filter(l => {
+    const tagMatch = activeTag === 'all' || l.tags.includes(activeTag);
+    const searchMatch = !q ||
+      l.title.toLowerCase().includes(q) ||
+      l.url.toLowerCase().includes(q) ||
+      l.tags.some(t => t.toLowerCase().includes(q));
+    return tagMatch && searchMatch;
+  });
 
   if (filtered.length === 0) {
     grid.replaceChildren();
     emptyState.hidden = false;
-    if (activeTag !== 'all') {
+    if (q) {
+      emptyState.querySelector('h2').textContent = `No results for "${searchQuery}"`;
+      emptyState.querySelector('p').textContent = 'Try a different search term or clear the search.';
+    } else if (activeTag !== 'all') {
       emptyState.querySelector('h2').textContent = `No links tagged "#${activeTag}"`;
       emptyState.querySelector('p').textContent = 'Try a different tag or clear the filter.';
     } else {
@@ -256,6 +269,23 @@ function init() {
   });
 
   document.getElementById('inputUrl').addEventListener('input', clearUrlError);
+
+  const searchInput = document.getElementById('searchInput');
+  const searchClear = document.getElementById('searchClear');
+
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value;
+    searchClear.hidden = !searchQuery;
+    render();
+  });
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchQuery = '';
+    searchClear.hidden = true;
+    searchInput.focus();
+    render();
+  });
 
   document.getElementById('tagInputWrapper').addEventListener('click', () => {
     document.getElementById('inputTag').focus();

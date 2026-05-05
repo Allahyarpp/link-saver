@@ -111,6 +111,67 @@ body {
   padding: 2rem 1.5rem;
 }
 
+/* ── Search bar ── */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  width: 17px;
+  height: 17px;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+#searchInput {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 0.75rem 2.75rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+
+#searchInput::placeholder { color: rgba(255, 255, 255, 0.35); }
+
+#searchInput:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+#searchInput::-webkit-search-cancel-button { display: none; }
+
+.search-clear {
+  position: absolute;
+  right: 0.8rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.68rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+.search-clear:hover { background: rgba(255, 255, 255, 0.22); color: var(--text); }
+
 /* ── Tag filter bar ── */
 .tag-bar {
   display: flex;

@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'ls_links';
+const SORT_KEY = 'ls_sort';
 
 const TAG_COLORS = [
   'tag-violet', 'tag-pink', 'tag-cyan', 'tag-amber',
@@ -8,6 +9,7 @@ const TAG_COLORS = [
 let links = [];
 let activeTag = 'all';
 let searchQuery = '';
+let sortOrder = localStorage.getItem(SORT_KEY) || 'newest';
 let modalTags = [];
 let editingId = null;
 const tagColorMap = new Map();
@@ -19,10 +21,24 @@ function loadLinks() {
   } catch {
     links = [];
   }
+  migrateLegacyTimestamps();
 }
 
 function persistLinks() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+}
+
+function migrateLegacyTimestamps() {
+  const missing = links.some(l => !l.createdAt);
+  if (!missing) return;
+  const base = Date.now();
+  links.forEach((l, i) => {
+    if (!l.createdAt) {
+      // older index → older timestamp; space them 1 minute apart
+      l.createdAt = base - (links.length - 1 - i) * 60_000;
+    }
+  });
+  persistLinks();
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -128,19 +144,30 @@ function renderTagBar() {
   );
 }
 
+function getSortedLinks(arr) {
+  const sorted = [...arr];
+  switch (sortOrder) {
+    case 'oldest': return sorted.sort((a, b) => a.createdAt - b.createdAt);
+    case 'title-az': return sorted.sort((a, b) => a.title.localeCompare(b.title));
+    case 'title-za': return sorted.sort((a, b) => b.title.localeCompare(a.title));
+    case 'custom': return sorted; // preserves links array order (set by drag-and-drop)
+    default: return sorted.sort((a, b) => b.createdAt - a.createdAt); // newest
+  }
+}
+
 function renderLinks() {
   const grid = document.getElementById('linksGrid');
   const emptyState = document.getElementById('emptyState');
   const q = searchQuery.toLowerCase();
 
-  const filtered = links.filter(l => {
+  const filtered = getSortedLinks(links.filter(l => {
     const tagMatch = activeTag === 'all' || l.tags.includes(activeTag);
     const searchMatch = !q ||
       l.title.toLowerCase().includes(q) ||
       l.url.toLowerCase().includes(q) ||
       l.tags.some(t => t.toLowerCase().includes(q));
     return tagMatch && searchMatch;
-  });
+  }));
 
   if (filtered.length === 0) {
     grid.replaceChildren();
@@ -160,11 +187,21 @@ function renderLinks() {
 
   emptyState.hidden = true;
 
+  const isTouchOnly = window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches;
+
   const cards = filtered.map((link, i) => {
     const article = document.createElement('article');
     article.className = 'link-card';
     article.dataset.id = link.id;
     article.style.animationDelay = `${i * 0.045}s`;
+
+    if (!isTouchOnly) {
+      article.draggable = true;
+      if (sortOrder !== 'custom') {
+        article.classList.add('drag-disabled');
+        article.title = 'Switch to Custom order to reorder';
+      }
+    }
 
     const tagsHtml = link.tags.map(t =>
       `<span class="tag ${getTagColor(t)}">#${escHtml(t)}</span>`
@@ -178,13 +215,13 @@ function renderLinks() {
       <div class="card-top">
         <img class="favicon" src="${getFaviconUrl(link.url)}" alt=""
              onerror="this.src='data:image/svg+xml,${fallbackSvg}'" loading="lazy">
-        <div class="card-actions">
-          <button class="edit-btn" aria-label="Edit link">
+        <div class="card-actions" draggable="false">
+          <button class="edit-btn" draggable="false" aria-label="Edit link">
             <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-.793.793-2.828-2.828.793-.793ZM11.379 5.793 3 14.172V17h2.828l8.38-8.379-2.83-2.828Z"/>
             </svg>
           </button>
-          <button class="delete-btn" aria-label="Delete link">✕</button>
+          <button class="delete-btn" draggable="false" aria-label="Delete link">✕</button>
         </div>
       </div>
       <div class="card-body">
@@ -202,14 +239,113 @@ function renderLinks() {
     article.querySelector('.card-title a').addEventListener('click', e => e.stopPropagation());
     article.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openEditModal(link); });
     article.querySelector('.delete-btn').addEventListener('click', e => { e.stopPropagation(); deleteLink(link.id); });
+
+    if (!isTouchOnly) {
+      article.addEventListener('dragstart', onDragStart);
+      article.addEventListener('dragend', onDragEnd);
+      article.addEventListener('dragover', onDragOver);
+      article.addEventListener('dragleave', onDragLeave);
+      article.addEventListener('drop', onDrop);
+    }
+
     return article;
   });
 
   grid.replaceChildren(...cards);
 }
 
+function renderSortSelect() {
+  const dropdown = document.getElementById('sortDropdown');
+  const existingCustom = dropdown.querySelector('[data-sort="custom"]');
+
+  if (!existingCustom) {
+    const btn = document.createElement('button');
+    btn.className = 'settings-item sort-item';
+    btn.dataset.sort = 'custom';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a1 1 0 0 0 0 2h14a1 1 0 1 0 0-2H3Zm0 5a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2H3Zm0 5a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H3Z"/></svg>Custom order`;
+    dropdown.appendChild(btn);
+  }
+
+  dropdown.querySelectorAll('.sort-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sort === sortOrder);
+  });
+
+  const toggle = document.getElementById('sortToggle');
+  toggle.classList.toggle('active', sortOrder !== 'newest');
+}
+
+// ── Drag-and-drop reordering ──────────────────────────────
+let dragSrcId = null;
+let pendingReorder = false;
+
+function onDragStart(e) {
+  dragSrcId = this.dataset.id;
+  pendingReorder = false;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrcId);
+  this.classList.add('dragging');
+  if (sortOrder !== 'custom') {
+    sortOrder = 'custom';
+    localStorage.setItem(SORT_KEY, sortOrder);
+  }
+}
+
+function onDragEnd() {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+    el.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+  if (pendingReorder) {
+    pendingReorder = false;
+    render();
+  }
+  dragSrcId = null;
+}
+
+function getDropPosition(e, target) {
+  const rect = target.getBoundingClientRect();
+  return e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (this.dataset.id === dragSrcId) return;
+  document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+    el.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+  const pos = getDropPosition(e, this);
+  this.classList.add(pos === 'top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+
+function onDragLeave(e) {
+  if (!this.contains(e.relatedTarget)) {
+    this.classList.remove('drag-over-top', 'drag-over-bottom');
+  }
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+  const targetId = this.dataset.id;
+  if (!dragSrcId || dragSrcId === targetId) return;
+
+  const srcIdx = links.findIndex(l => l.id === dragSrcId);
+  if (srcIdx === -1) return;
+  const pos = getDropPosition(e, this);
+  const [removed] = links.splice(srcIdx, 1);
+  const insertAt = links.findIndex(l => l.id === targetId);
+  if (insertAt === -1) { links.push(removed); } else {
+    links.splice(pos === 'top' ? insertAt : insertAt + 1, 0, removed);
+  }
+
+  persistLinks();
+  pendingReorder = true;
+}
+
 function render() {
   renderTagBar();
+  renderSortSelect();
   renderLinks();
 }
 
@@ -220,6 +356,8 @@ function openModal() {
 }
 
 function closeModal() {
+  clearTimeout(titleFetchTimer);
+  document.getElementById('inputTitle').placeholder = '';
   editingId = null;
   document.getElementById('modalTitle').textContent = 'Add Link';
   document.getElementById('saveBtn').textContent = 'Save Link';
@@ -280,6 +418,109 @@ function commitTagInput() {
   input.value = '';
 }
 
+// ── URL title fetch ───────────────────────────────────────
+let titleFetchTimer = null;
+
+async function fetchAndFillTitle(url) {
+  const titleInput = document.getElementById('inputTitle');
+  if (titleInput.value.trim()) return;
+
+  titleInput.placeholder = 'Fetching title…';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(
+      `https://api.microlink.io/?url=${encodeURIComponent(url)}`,
+      { signal: controller.signal }
+    );
+    const data = await res.json();
+    if (data?.data?.title && !titleInput.value.trim()) {
+      titleInput.value = data.data.title;
+    }
+  } catch {
+    // silently give up on network errors or timeouts
+  } finally {
+    clearTimeout(timeout);
+    titleInput.placeholder = '';
+  }
+}
+
+function onUrlInput() {
+  if (editingId) return;
+  clearTimeout(titleFetchTimer);
+  const raw = document.getElementById('inputUrl').value.trim();
+  if (!raw) return;
+  let url;
+  try { url = new URL(normalizeUrl(raw)); } catch { return; }
+  titleFetchTimer = setTimeout(() => fetchAndFillTitle(url.href), 600);
+}
+
+// ── Toast ─────────────────────────────────────────────────
+function showToast(message, isError = false) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (isError ? ' toast-error' : '');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.22s ease both';
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  }, 2800);
+}
+
+// ── Export ────────────────────────────────────────────────
+function exportLinks() {
+  const json = JSON.stringify(links, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `link-saver-backup-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Import ────────────────────────────────────────────────
+function importLinks(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(e.target.result);
+    } catch {
+      showToast('Invalid backup file', true);
+      return;
+    }
+
+    if (
+      !Array.isArray(parsed) ||
+      parsed.some(item => typeof item !== 'object' || item === null || !item.id || !item.url)
+    ) {
+      showToast('Invalid backup file', true);
+      return;
+    }
+
+    const confirmed = confirm(
+      `Import ${parsed.length} link${parsed.length !== 1 ? 's' : ''}? This will REPLACE your current ${links.length} link${links.length !== 1 ? 's' : ''}. Continue?`
+    );
+    if (!confirmed) return;
+
+    links = parsed;
+    persistLinks();
+    render();
+    showToast(`Imported ${parsed.length} link${parsed.length !== 1 ? 's' : ''}`);
+  };
+  reader.readAsText(file);
+}
+
 // ── Init ─────────────────────────────────────────────────
 function init() {
   loadLinks();
@@ -304,7 +545,7 @@ function init() {
     }
   });
 
-  document.getElementById('inputUrl').addEventListener('input', clearUrlError);
+  document.getElementById('inputUrl').addEventListener('input', () => { clearUrlError(); onUrlInput(); });
 
   const searchInput = document.getElementById('searchInput');
   const searchClear = document.getElementById('searchClear');
@@ -323,6 +564,34 @@ function init() {
     render();
   });
 
+  const sortToggle = document.getElementById('sortToggle');
+  const sortDropdown = document.getElementById('sortDropdown');
+
+  sortToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !sortDropdown.hidden;
+    sortDropdown.hidden = isOpen;
+    sortToggle.setAttribute('aria-expanded', String(!isOpen));
+    sortToggle.classList.toggle('active', !isOpen || sortOrder !== 'newest');
+  });
+
+  sortDropdown.addEventListener('click', (e) => {
+    const btn = e.target.closest('.sort-item');
+    if (!btn) return;
+    sortOrder = btn.dataset.sort;
+    localStorage.setItem(SORT_KEY, sortOrder);
+    sortDropdown.hidden = true;
+    sortToggle.setAttribute('aria-expanded', 'false');
+    render();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('sortMenu').contains(e.target)) {
+      sortDropdown.hidden = true;
+      sortToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
   const searchWrapper = document.getElementById('searchWrapper');
   const searchToggleBtn = document.getElementById('searchToggle');
 
@@ -339,6 +608,49 @@ function init() {
       searchWrapper.hidden = false;
       searchToggleBtn.classList.add('active');
       searchInput.focus();
+    }
+  });
+
+  // Settings dropdown
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsDropdown = document.getElementById('settingsDropdown');
+
+  settingsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !settingsDropdown.hidden;
+    settingsDropdown.hidden = isOpen;
+    settingsToggle.setAttribute('aria-expanded', String(!isOpen));
+    settingsToggle.classList.toggle('active', !isOpen);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('settingsMenu').contains(e.target)) {
+      settingsDropdown.hidden = true;
+      settingsToggle.setAttribute('aria-expanded', 'false');
+      settingsToggle.classList.remove('active');
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    settingsDropdown.hidden = true;
+    settingsToggle.setAttribute('aria-expanded', 'false');
+    settingsToggle.classList.remove('active');
+    exportLinks();
+  });
+
+  const importFileInput = document.getElementById('importFileInput');
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    settingsDropdown.hidden = true;
+    settingsToggle.setAttribute('aria-expanded', 'false');
+    settingsToggle.classList.remove('active');
+    importFileInput.value = '';
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener('change', () => {
+    if (importFileInput.files.length > 0) {
+      importLinks(importFileInput.files[0]);
     }
   });
 

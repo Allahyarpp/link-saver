@@ -43,11 +43,60 @@
         <span>Link Saver</span>
       </div>
       <div class="nav-actions">
+        <div class="sort-menu" id="sortMenu">
+          <button id="sortToggle" class="nav-btn" aria-label="Sort" aria-expanded="false" aria-haspopup="true">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M3 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1ZM3 10a1 1 0 0 1 1-1h8a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1ZM4 14a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H4Z"/>
+            </svg>
+          </button>
+          <div class="settings-dropdown sort-dropdown" id="sortDropdown" hidden>
+            <button class="settings-item sort-item" data-sort="newest">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 0 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z" clip-rule="evenodd"/></svg>
+              Newest first
+            </button>
+            <button class="settings-item sort-item" data-sort="oldest">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.638l3.96-4.158a.75.75 0 1 1 1.08 1.04l-5.25 5.5a.75.75 0 0 1-1.08 0l-5.25-5.5a.75.75 0 1 1 1.08-1.04l3.96 4.158V3.75A.75.75 0 0 1 10 3Z" clip-rule="evenodd"/></svg>
+              Oldest first
+            </button>
+            <button class="settings-item sort-item" data-sort="title-az">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 3.75A.75.75 0 0 1 2.75 3h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 3.75Zm0 4.167a.75.75 0 0 1 .75-.75h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75Zm0 4.166a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>
+              Title A→Z
+            </button>
+            <button class="settings-item sort-item" data-sort="title-za">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 3.75A.75.75 0 0 1 2.75 3h5.5a.75.75 0 0 1 0 1.5h-5.5A.75.75 0 0 1 2 3.75Zm0 4.167a.75.75 0 0 1 .75-.75h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75Zm0 4.166a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>
+              Title Z→A
+            </button>
+          </div>
+        </div>
         <button id="searchToggle" class="nav-btn" aria-label="Search">
           <svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/>
           </svg>
         </button>
+        <div class="settings-menu" id="settingsMenu">
+          <button id="settingsToggle" class="nav-btn" aria-label="Settings" aria-expanded="false" aria-haspopup="true">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M8.34 1.804A1 1 0 0 1 9.32 1h1.36a1 1 0 0 1 .98.804l.295 1.473c.497.144.971.342 1.416.587l1.25-.834a1 1 0 0 1 1.262.125l.962.962a1 1 0 0 1 .125 1.261l-.834 1.25c.245.445.443.919.587 1.416l1.473.296a1 1 0 0 1 .804.98v1.36a1 1 0 0 1-.804.98l-1.473.295a6.95 6.95 0 0 1-.587 1.416l.834 1.25a1 1 0 0 1-.125 1.262l-.962.962a1 1 0 0 1-1.261.125l-1.25-.834a6.953 6.953 0 0 1-1.416.587l-.296 1.473a1 1 0 0 1-.98.804H9.32a1 1 0 0 1-.98-.804l-.295-1.473a6.957 6.957 0 0 1-1.416-.587l-1.25.834a1 1 0 0 1-1.262-.125l-.962-.962a1 1 0 0 1-.125-1.261l.834-1.25a6.957 6.957 0 0 1-.587-1.416l-1.473-.296A1 1 0 0 1 1 10.68V9.32a1 1 0 0 1 .804-.98l1.473-.295c.144-.497.342-.971.587-1.416l-.834-1.25a1 1 0 0 1 .125-1.262l.962-.962A1 1 0 0 1 5.378 3.03l1.25.834a6.957 6.957 0 0 1 1.416-.587L8.34 1.804ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+          <div class="settings-dropdown" id="settingsDropdown" hidden>
+            <button class="settings-item" id="exportBtn">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/>
+                <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/>
+              </svg>
+              Export
+            </button>
+            <button class="settings-item" id="importBtn">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0L5.205 6.735a.75.75 0 0 0 1.09 1.03L9.25 4.636v8.614Z"/>
+                <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/>
+              </svg>
+              Import
+            </button>
+          </div>
+          <input type="file" id="importFileInput" accept=".json" style="display:none" aria-hidden="true">
+        </div>
         <button id="openModal" class="nav-btn nav-btn-add" aria-label="Add link">
           <svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>

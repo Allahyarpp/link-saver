@@ -9,6 +9,7 @@ let links = [];
 let activeTag = 'all';
 let searchQuery = '';
 let modalTags = [];
+let editingId = null;
 const tagColorMap = new Map();
 
 // ── Storage ──────────────────────────────────────────────
@@ -81,6 +82,15 @@ function addLink({ url, title, note, tags }) {
     tags,
     createdAt: Date.now(),
   });
+  persistLinks();
+  render();
+}
+
+function updateLink(id, { url, title, note, tags }) {
+  const normalized = normalizeUrl(url);
+  const idx = links.findIndex(l => l.id === id);
+  if (idx === -1) return;
+  links[idx] = { ...links[idx], url: normalized, title: title.trim() || getHostname(normalized), note: note.trim(), tags };
   persistLinks();
   render();
 }
@@ -168,7 +178,14 @@ function renderLinks() {
       <div class="card-top">
         <img class="favicon" src="${getFaviconUrl(link.url)}" alt=""
              onerror="this.src='data:image/svg+xml,${fallbackSvg}'" loading="lazy">
-        <button class="delete-btn" data-id="${escHtml(link.id)}" aria-label="Delete link">✕</button>
+        <div class="card-actions">
+          <button class="edit-btn" aria-label="Edit link">
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-.793.793-2.828-2.828.793-.793ZM11.379 5.793 3 14.172V17h2.828l8.38-8.379-2.83-2.828Z"/>
+            </svg>
+          </button>
+          <button class="delete-btn" aria-label="Delete link">✕</button>
+        </div>
       </div>
       <div class="card-body">
         <h3 class="card-title">
@@ -181,7 +198,10 @@ function renderLinks() {
       <time class="card-date">${formatDate(link.createdAt)}</time>
     `;
 
-    article.querySelector('.delete-btn').addEventListener('click', () => deleteLink(link.id));
+    article.addEventListener('click', () => window.open(link.url, '_blank', 'noopener,noreferrer'));
+    article.querySelector('.card-title a').addEventListener('click', e => e.stopPropagation());
+    article.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openEditModal(link); });
+    article.querySelector('.delete-btn').addEventListener('click', e => { e.stopPropagation(); deleteLink(link.id); });
     return article;
   });
 
@@ -200,11 +220,27 @@ function openModal() {
 }
 
 function closeModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add Link';
+  document.getElementById('saveBtn').textContent = 'Save Link';
   document.getElementById('modalOverlay').classList.remove('open');
   document.getElementById('linkForm').reset();
   clearUrlError();
   modalTags = [];
   renderModalTagPills();
+}
+
+function openEditModal(link) {
+  editingId = link.id;
+  document.getElementById('modalTitle').textContent = 'Edit Link';
+  document.getElementById('saveBtn').textContent = 'Update';
+  document.getElementById('inputUrl').value = link.url;
+  document.getElementById('inputTitle').value = link.title;
+  document.getElementById('inputNote').value = link.note;
+  modalTags = [...link.tags];
+  renderModalTagPills();
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('inputUrl').focus(), 50);
 }
 
 function clearUrlError() {
@@ -325,12 +361,18 @@ function init() {
 
     commitTagInput();
 
-    addLink({
+    const payload = {
       url: rawUrl,
       title: document.getElementById('inputTitle').value,
       note: document.getElementById('inputNote').value,
       tags: [...modalTags],
-    });
+    };
+
+    if (editingId) {
+      updateLink(editingId, payload);
+    } else {
+      addLink(payload);
+    }
 
     closeModal();
   });

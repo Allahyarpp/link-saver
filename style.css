@@ -384,6 +384,8 @@ body::before {
   transition: transform var(--t), box-shadow var(--t), border-color var(--t);
 }
 
+.link-card { cursor: pointer; }
+
 .link-card:hover {
   transform: translateY(-1px);
   border-color: rgba(209, 254, 23, 0.15);
@@ -451,6 +453,13 @@ body::before {
   object-fit: contain;
 }
 
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-btn,
 .delete-btn {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -468,8 +477,10 @@ body::before {
   flex-shrink: 0;
 }
 
+.link-card:hover .edit-btn,
 .link-card:hover .delete-btn { opacity: 1; }
 
+.edit-btn:hover,
 .delete-btn:hover {
   transform: scale(1.08);
   box-shadow: 0 0 0 4px var(--accent-ring);

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Link Saver</title>
+  <title>Linkvault</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,22 +26,8 @@
     <!-- Glassy pill navbar -->
     <nav class="navbar">
       <div class="nav-brand">
-        <svg class="logo-svg" width="42" height="27" viewBox="0 0 42 27" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Link Saver">
-          <defs>
-            <linearGradient id="logoGrad" x1="0" y1="0" x2="42" y2="27" gradientUnits="userSpaceOnUse">
-              <stop offset="0%"   stop-color="#7c3aed"/>
-              <stop offset="50%"  stop-color="#db2777"/>
-              <stop offset="100%" stop-color="#0ea5e9"/>
-            </linearGradient>
-            <mask id="link1Mask">
-              <rect width="42" height="27" fill="white"/>
-              <rect x="16" y="11" width="24" height="14" rx="7" fill="black"/>
-            </mask>
-          </defs>
-          <rect x="2"  y="2"  width="24" height="14" rx="7" stroke="url(#logoGrad)" stroke-width="2.5" fill="none" mask="url(#link1Mask)"/>
-          <rect x="16" y="11" width="24" height="14" rx="7" stroke="url(#logoGrad)" stroke-width="2.5" fill="none"/>
-        </svg>
-        <span>Link Saver</span>
+        <img src="logo.svg" alt="" class="nav-logo">
+        <span class="nav-brand-name">LinkVault</span>
       </div>
       <div class="nav-actions">
         <div class="sort-menu" id="sortMenu">
@@ -118,9 +105,10 @@
       <div class="tag-bar" id="tagBar" hidden></div>
       <div class="links-grid" id="linksGrid"></div>
       <div class="empty-state" id="emptyState">
-        <div class="empty-icon">🔗</div>
-        <h2>No links saved yet</h2>
-        <p>Click <strong>+ Add Link</strong> to save your first URL.</p>
+        <div class="empty-icon" aria-hidden="true">📭</div>
+        <h2>Your link library is empty</h2>
+        <p>Start building your collection — click <strong>+ Add Link</strong> to save your first URL.</p>
+        <button class="btn-primary empty-state-add" id="emptyStateAdd">+ Add Link</button>
       </div>
     </main>
 
@@ -161,6 +149,10 @@
         </div>
       </form>
     </div>
+  </div>
+
+  <div class="link-counter" id="linkCounter" aria-live="polite" aria-label="Saved links count">
+    <span id="linkCountNum">0</span> saved
   </div>
 
   <script src="app.js"></script>

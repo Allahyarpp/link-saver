@@ -171,21 +171,32 @@ function renderLinks() {
 
   if (filtered.length === 0) {
     grid.replaceChildren();
-    emptyState.hidden = false;
+    const addBtn = emptyState.querySelector('#emptyStateAdd');
     if (q) {
       emptyState.querySelector('h2').textContent = `No results for "${searchQuery}"`;
       emptyState.querySelector('p').textContent = 'Try a different search term or clear the search.';
+      if (addBtn) addBtn.hidden = true;
     } else if (activeTag !== 'all') {
       emptyState.querySelector('h2').textContent = `No links tagged "#${activeTag}"`;
       emptyState.querySelector('p').textContent = 'Try a different tag or clear the filter.';
+      if (addBtn) addBtn.hidden = true;
     } else {
-      emptyState.querySelector('h2').textContent = 'No links saved yet';
-      emptyState.querySelector('p').innerHTML = 'Click <strong>+ Add Link</strong> to save your first URL.';
+      emptyState.querySelector('h2').textContent = 'Your link library is empty';
+      emptyState.querySelector('p').innerHTML = 'Start building your collection — click <strong>+ Add Link</strong> to save your first URL.';
+      if (addBtn) addBtn.hidden = false;
     }
+    emptyState.classList.remove('hiding');
+    emptyState.hidden = false;
     return;
   }
 
-  emptyState.hidden = true;
+  if (!emptyState.hidden) {
+    emptyState.classList.add('hiding');
+    emptyState.addEventListener('animationend', () => {
+      emptyState.hidden = true;
+      emptyState.classList.remove('hiding');
+    }, { once: true });
+  }
 
   const isTouchOnly = window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches;
 
@@ -343,10 +354,23 @@ function onDrop(e) {
   pendingReorder = true;
 }
 
+function renderLinkCounter() {
+  const numEl = document.getElementById('linkCountNum');
+  const next = links.length;
+  const prev = parseInt(numEl.textContent, 10);
+  if (next !== prev) {
+    numEl.textContent = next;
+    numEl.classList.remove('bump');
+    void numEl.offsetWidth; // reflow to restart animation
+    numEl.classList.add('bump');
+  }
+}
+
 function render() {
   renderTagBar();
   renderSortSelect();
   renderLinks();
+  renderLinkCounter();
 }
 
 // ── Modal ─────────────────────────────────────────────────
@@ -481,7 +505,7 @@ function exportLinks() {
   const date = new Date().toISOString().slice(0, 10);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `link-saver-backup-${date}.json`;
+  a.download = `linkvault-backup-${date}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -527,6 +551,7 @@ function init() {
   render();
 
   document.getElementById('openModal').addEventListener('click', openModal);
+  document.getElementById('emptyStateAdd').addEventListener('click', openModal);
   document.getElementById('closeModal').addEventListener('click', closeModal);
   document.getElementById('cancelModal').addEventListener('click', closeModal);
 

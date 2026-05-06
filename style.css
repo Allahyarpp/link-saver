@@ -137,7 +137,7 @@ body::before {
   position: sticky;
   top: 20px;
   width: fit-content;
-  min-width: 360px;
+  min-width: 420px;
   margin: 0 auto 32px;
   padding: 10px 12px 10px 18px;
   display: flex;
@@ -176,28 +176,29 @@ body::before {
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.01em;
+  gap: 8px;
   user-select: none;
+  text-decoration: none;
 }
 
-/* Override logo gradient stroke → solid lime */
-.logo-svg rect {
-  stroke: var(--accent);
-}
-
-.logo-svg {
+.nav-logo {
+  height: 28px;
+  width: auto;
   display: block;
   flex-shrink: 0;
-  cursor: pointer;
   transition: transform var(--t), filter var(--t);
 }
 
-.logo-svg:hover {
-  transform: scale(1.08);
+.nav-brand-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.nav-brand:hover .nav-logo {
+  transform: scale(1.05);
   filter: drop-shadow(0 0 6px rgba(209, 254, 23, 0.5));
 }
 
@@ -593,9 +594,34 @@ body::before {
   text-align: center;
   padding: 6rem 1rem;
   color: var(--text-muted);
+  animation: emptyFadeIn 0.4s ease both;
 }
 
-.empty-icon { font-size: 3.5rem; margin-bottom: 1.25rem; }
+.empty-state.hiding {
+  animation: emptyFadeOut 0.3s ease forwards;
+}
+
+@keyframes emptyFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes emptyFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.empty-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.25rem;
+  display: block;
+  animation: emptyIconFloat 3s ease-in-out infinite;
+}
+
+@keyframes emptyIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
 
 .empty-state h2 {
   font-size: 1.4rem;
@@ -604,8 +630,13 @@ body::before {
   margin-bottom: 0.5rem;
 }
 
-.empty-state p { font-size: 0.92rem; }
+.empty-state p { font-size: 0.92rem; margin-bottom: 1.75rem; }
 .empty-state strong { color: var(--accent); }
+
+.empty-state-add {
+  font-size: 0.9rem;
+  padding: 0.6rem 1.5rem;
+}
 
 /* ── Modal ── */
 .modal-overlay {
@@ -915,6 +946,43 @@ body::before {
 @keyframes toastOut {
   from { opacity: 1; transform: translateX(-50%) translateY(0); }
   to   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+}
+
+/* ── Link counter badge ── */
+.link-counter {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9500;
+  background: rgba(10, 10, 10, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(209, 254, 23, 0.22);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(209, 254, 23, 0.06);
+  pointer-events: none;
+  user-select: none;
+}
+
+#linkCountNum {
+  display: inline-block;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+#linkCountNum.bump {
+  animation: counterBump 0.2s ease both;
+}
+
+@keyframes counterBump {
+  0%   { transform: scale(1);    opacity: 1; }
+  40%  { transform: scale(1.35); opacity: 0.7; }
+  100% { transform: scale(1);    opacity: 1; }
 }
 
 /* ── Responsive ── */

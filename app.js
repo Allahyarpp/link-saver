@@ -1,4 +1,3 @@
-const STORAGE_KEY = 'ls_links';
 const SORT_KEY = 'ls_sort';
 
 const TAG_COLORS = [
@@ -14,31 +13,31 @@ let modalTags = [];
 let editingId = null;
 const tagColorMap = new Map();
 
-// ── Storage ──────────────────────────────────────────────
-function loadLinks() {
-  try {
-    links = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
-    links = [];
-  }
-  migrateLegacyTimestamps();
+let sb = null;
+let currentUser = null;
+
+// ── Supabase boundary ────────────────────────────────────
+// DB rows use snake_case (user_id, created_at, position) but the rest of the
+// app uses camelCase (createdAt). Map at the boundary so render code is unchanged.
+function rowToLink(row) {
+  return {
+    id: row.id,
+    url: row.url,
+    title: row.title,
+    note: row.note || '',
+    tags: row.tags || [],
+    createdAt: new Date(row.created_at).getTime(),
+    position: row.position,
+  };
 }
 
-function persistLinks() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
-}
-
-function migrateLegacyTimestamps() {
-  const missing = links.some(l => !l.createdAt);
-  if (!missing) return;
-  const base = Date.now();
-  links.forEach((l, i) => {
-    if (!l.createdAt) {
-      // older index → older timestamp; space them 1 minute apart
-      l.createdAt = base - (links.length - 1 - i) * 60_000;
-    }
-  });
-  persistLinks();
+async function fetchLinks() {
+  const { data, error } = await sb
+    .from('links')
+    .select('*')
+    .order('position', { ascending: true });
+  if (error) throw error;
+  links = data.map(rowToLink);
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -88,26 +87,43 @@ function getAllTags() {
 }
 
 // ── CRUD ─────────────────────────────────────────────────
-function addLink({ url, title, note, tags }) {
+async function addLink({ url, title, note, tags }) {
   const normalized = normalizeUrl(url);
-  links.unshift({
-    id: crypto.randomUUID(),
+  // New links sort to the top: smaller position = earlier in the list.
+  const minPos = links.reduce((m, l) => Math.min(m, l.position ?? 0), 0);
+  const row = {
+    user_id: currentUser.id,
     url: normalized,
     title: title.trim() || getHostname(normalized),
     note: note.trim(),
     tags,
-    createdAt: Date.now(),
-  });
-  persistLinks();
+    position: minPos - 1,
+  };
+  const { data, error } = await sb.from('links').insert(row).select().single();
+  if (error) {
+    showToast('Could not save link', true);
+    return;
+  }
+  links.unshift(rowToLink(data));
   render();
 }
 
-function updateLink(id, { url, title, note, tags }) {
+async function updateLink(id, { url, title, note, tags }) {
   const normalized = normalizeUrl(url);
   const idx = links.findIndex(l => l.id === id);
   if (idx === -1) return;
-  links[idx] = { ...links[idx], url: normalized, title: title.trim() || getHostname(normalized), note: note.trim(), tags };
-  persistLinks();
+  const patch = {
+    url: normalized,
+    title: title.trim() || getHostname(normalized),
+    note: note.trim(),
+    tags,
+  };
+  const { error } = await sb.from('links').update(patch).eq('id', id);
+  if (error) {
+    showToast('Could not update link', true);
+    return;
+  }
+  links[idx] = { ...links[idx], ...patch };
   render();
 }
 
@@ -115,9 +131,14 @@ function deleteLink(id) {
   const card = document.querySelector(`.link-card[data-id="${id}"]`);
   if (!card) return;
   card.classList.add('deleting');
-  card.addEventListener('animationend', () => {
+  card.addEventListener('animationend', async () => {
+    const { error } = await sb.from('links').delete().eq('id', id);
+    if (error) {
+      showToast('Could not delete link', true);
+      card.classList.remove('deleting');
+      return;
+    }
     links = links.filter(l => l.id !== id);
-    persistLinks();
     render();
   }, { once: true });
 }
@@ -150,7 +171,7 @@ function getSortedLinks(arr) {
     case 'oldest': return sorted.sort((a, b) => a.createdAt - b.createdAt);
     case 'title-az': return sorted.sort((a, b) => a.title.localeCompare(b.title));
     case 'title-za': return sorted.sort((a, b) => b.title.localeCompare(a.title));
-    case 'custom': return sorted; // preserves links array order (set by drag-and-drop)
+    case 'custom': return sorted.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     default: return sorted.sort((a, b) => b.createdAt - a.createdAt); // newest
   }
 }
@@ -301,7 +322,7 @@ function onDragStart(e) {
   }
 }
 
-function onDragEnd() {
+async function onDragEnd() {
   this.classList.remove('dragging');
   document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
     el.classList.remove('drag-over-top', 'drag-over-bottom');
@@ -309,8 +330,23 @@ function onDragEnd() {
   if (pendingReorder) {
     pendingReorder = false;
     render();
+    await persistPositions();
   }
   dragSrcId = null;
+}
+
+async function persistPositions() {
+  // Rewrite position values on every reorder so order is stable across sessions.
+  const updates = links.map((l, i) => ({ id: l.id, position: i }));
+  links = links.map((l, i) => ({ ...l, position: i }));
+  // Send updates in parallel; bail on first failure with a toast.
+  const results = await Promise.all(
+    updates.map(u =>
+      sb.from('links').update({ position: u.position }).eq('id', u.id)
+    )
+  );
+  const failed = results.find(r => r.error);
+  if (failed) showToast('Could not save new order', true);
 }
 
 function getDropPosition(e, target) {
@@ -350,7 +386,6 @@ function onDrop(e) {
     links.splice(pos === 'top' ? insertAt : insertAt + 1, 0, removed);
   }
 
-  persistLinks();
   pendingReorder = true;
 }
 
@@ -497,7 +532,7 @@ function showToast(message, isError = false) {
   }, 2800);
 }
 
-// ── Export ────────────────────────────────────────────────
+// ── Export / Import ───────────────────────────────────────
 function exportLinks() {
   const json = JSON.stringify(links, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -512,10 +547,9 @@ function exportLinks() {
   URL.revokeObjectURL(url);
 }
 
-// ── Import ────────────────────────────────────────────────
 function importLinks(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     let parsed;
     try {
       parsed = JSON.parse(e.target.result);
@@ -526,7 +560,7 @@ function importLinks(file) {
 
     if (
       !Array.isArray(parsed) ||
-      parsed.some(item => typeof item !== 'object' || item === null || !item.id || !item.url)
+      parsed.some(item => typeof item !== 'object' || item === null || !item.url)
     ) {
       showToast('Invalid backup file', true);
       return;
@@ -537,19 +571,152 @@ function importLinks(file) {
     );
     if (!confirmed) return;
 
-    links = parsed;
-    persistLinks();
+    // Replace = delete all current, then bulk insert. Use the user's existing
+    // createdAt if present, otherwise let the server default it.
+    const { error: delErr } = await sb.from('links').delete().eq('user_id', currentUser.id);
+    if (delErr) { showToast('Import failed', true); return; }
+
+    const rows = parsed.map((item, i) => ({
+      user_id: currentUser.id,
+      url: item.url,
+      title: item.title || getHostname(item.url),
+      note: item.note || '',
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      position: i,
+      ...(item.createdAt ? { created_at: new Date(item.createdAt).toISOString() } : {}),
+    }));
+    const { data, error } = await sb.from('links').insert(rows).select();
+    if (error) { showToast('Import failed', true); return; }
+
+    links = data.map(rowToLink);
     render();
     showToast(`Imported ${parsed.length} link${parsed.length !== 1 ? 's' : ''}`);
   };
   reader.readAsText(file);
 }
 
-// ── Init ─────────────────────────────────────────────────
-function init() {
-  loadLinks();
-  render();
+// ── Auth ─────────────────────────────────────────────────
+let authMode = 'signin'; // 'signin' | 'signup'
 
+function setAuthMode(mode) {
+  authMode = mode;
+  const isSignup = mode === 'signup';
+  document.getElementById('authTitle').textContent = isSignup ? 'Create account' : 'Sign in';
+  document.getElementById('authSubtitle').textContent = isSignup
+    ? 'Save links to your private library, accessible from any device.'
+    : 'Welcome back. Sign in to access your links.';
+  document.getElementById('authSubmit').textContent = isSignup ? 'Sign up' : 'Sign in';
+  document.getElementById('authToggleText').textContent = isSignup
+    ? 'Already have an account?'
+    : "Don't have an account?";
+  document.getElementById('authToggleBtn').textContent = isSignup ? 'Sign in' : 'Sign up';
+  document.getElementById('authPassword').autocomplete = isSignup ? 'new-password' : 'current-password';
+  hideAuthError();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+function hideAuthError() {
+  document.getElementById('authError').hidden = true;
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const submitBtn = document.getElementById('authSubmit');
+
+  if (!email || password.length < 6) {
+    showAuthError('Enter an email and a password of at least 6 characters.');
+    return;
+  }
+
+  hideAuthError();
+  submitBtn.disabled = true;
+  const origText = submitBtn.textContent;
+  submitBtn.textContent = authMode === 'signup' ? 'Creating account…' : 'Signing in…';
+
+  try {
+    const { error } = authMode === 'signup'
+      ? await sb.auth.signUp({ email, password })
+      : await sb.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      showAuthError(error.message);
+      return;
+    }
+    // Success path is handled by onAuthStateChange.
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
+  }
+}
+
+function showAuthOverlay() {
+  document.getElementById('authOverlay').hidden = false;
+  document.getElementById('signOutBtn').hidden = true;
+  document.getElementById('loadingState').hidden = true;
+  // Hide the empty-state "your library is empty" so it doesn't peek behind the overlay.
+  document.getElementById('emptyState').hidden = true;
+}
+
+function hideAuthOverlay() {
+  document.getElementById('authOverlay').hidden = true;
+  document.getElementById('signOutBtn').hidden = false;
+}
+
+async function onSignedIn(user) {
+  currentUser = user;
+  hideAuthOverlay();
+  document.getElementById('loadingState').hidden = false;
+  try {
+    await fetchLinks();
+  } catch (err) {
+    showToast('Could not load links', true);
+    console.error(err);
+  }
+  document.getElementById('loadingState').hidden = true;
+  render();
+}
+
+function onSignedOut() {
+  currentUser = null;
+  links = [];
+  tagColorMap.clear();
+  searchQuery = '';
+  activeTag = 'all';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClear').hidden = true;
+  document.getElementById('linksGrid').replaceChildren();
+  document.getElementById('linkCountNum').textContent = '0';
+  document.getElementById('tagBar').hidden = true;
+  // Reset auth form
+  document.getElementById('authForm').reset();
+  setAuthMode('signin');
+  showAuthOverlay();
+}
+
+// ── Init ─────────────────────────────────────────────────
+async function init() {
+  if (!window.LV_CONFIG?.SUPABASE_URL || !window.LV_CONFIG?.SUPABASE_ANON_KEY) {
+    document.body.innerHTML =
+      '<div style="padding:2rem;color:#fca5a5;font-family:system-ui;max-width:600px;margin:4rem auto;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:12px;">' +
+      '<h2 style="margin-bottom:0.5rem;">Missing Supabase config</h2>' +
+      '<p>Copy <code>config.example.js</code> to <code>config.js</code> and fill in your Supabase project URL and anon key.</p>' +
+      '</div>';
+    return;
+  }
+
+  sb = window.supabase.createClient(
+    window.LV_CONFIG.SUPABASE_URL,
+    window.LV_CONFIG.SUPABASE_ANON_KEY
+  );
+
+  // Wire UI listeners up front so they work whether or not we're logged in.
   document.getElementById('openModal').addEventListener('click', openModal);
   document.getElementById('emptyStateAdd').addEventListener('click', openModal);
   document.getElementById('closeModal').addEventListener('click', closeModal);
@@ -712,6 +879,34 @@ function init() {
     }
 
     closeModal();
+  });
+
+  // Auth listeners
+  document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
+  document.getElementById('authToggleBtn').addEventListener('click', () => {
+    setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
+  });
+  document.getElementById('signOutBtn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+  });
+
+  // Bootstrap session
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    await onSignedIn(session.user);
+  } else {
+    showAuthOverlay();
+  }
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      // Avoid double-fetch on initial bootstrap (already handled above).
+      if (!currentUser || currentUser.id !== session.user.id) {
+        onSignedIn(session.user);
+      }
+    } else if (event === 'SIGNED_OUT') {
+      onSignedOut();
+    }
   });
 }
 
